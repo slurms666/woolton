@@ -73,27 +73,27 @@ def format_daily_summary(data: Dict) -> str:
 
 def format_rain_timeline(data: Dict) -> Tuple[str, List[Tuple[str, float]]]:
     hourly = data["hourly"]
-
     current_time = data["current"].get("time", "")
-
     start_idx = _find_hour_index(hourly, current_time)
 
-    times = hourly.get("time", [])[start_idx : start_idx + 12]
-    probs = hourly.get("precipitation_probability", [])[start_idx : start_idx + 12]
+    times = hourly.get("time", [])[start_idx:start_idx + 12]
+    probs = hourly.get("precipitation_probability", [])[start_idx:start_idx + 12]
 
     rain_points: List[Tuple[str, float]] = []
-
     lines = ["🌧 Rain risk (next 12 hours)"]
 
     for t, p in zip(times, probs):
 
         hhmm = t[11:16]
-
         prob = safe_float(p)
 
         rain_points.append((hhmm, prob))
 
-        lines.append(f"{hhmm} {safe_round(prob)}%")
+        # visual bar
+        bars = int(prob / 20)
+        bar = "█" * bars + "░" * (5 - bars)
+
+        lines.append(f"{hhmm} {bar} {safe_round(prob)}%")
 
     return "\n".join(lines), rain_points
 
@@ -167,8 +167,30 @@ def generate_practical_advice(data: Dict) -> str:
 
     return "👕 Practical Advice\n" + " ".join(tips)
 
+def delivery_round_score(data: Dict) -> str:
 
+    daily = data["daily"]
+
+    rain = safe_float(_safe_get(daily.get("precipitation_probability_max", []), 0))
+    gust = safe_float(_safe_get(daily.get("wind_gusts_10m_max", []), 0))
+    temp = safe_float(data["current"].get("temperature_2m"))
+
+    if rain > 60:
+        return "📦 Delivery Outlook\n🔴 Poor conditions – rain likely"
+
+    if gust > 30:
+        return "📦 Delivery Outlook\n🔴 Poor conditions – very windy"
+
+    if rain > 30 or gust > 20:
+        return "📦 Delivery Outlook\n🟡 Mixed conditions"
+
+    if temp < 2:
+        return "📦 Delivery Outlook\n🟡 Very cold start"
+
+    return "📦 Delivery Outlook\n🟢 Good conditions"
+    
 def format_weather_message(weather_data: Dict) -> str:
+    outlook = delivery_round_score(weather_data)
 
     header = "📮 Woolton DO Weather – L25 Area\n🕖 Daily briefing – 07:00"
 
@@ -195,7 +217,7 @@ def format_weather_message(weather_data: Dict) -> str:
         f"Max rain chance {max_rain}% today with gusts up to {max_gust} mph."
     )
 
-    parts = [header, current, daily, rain_timeline]
+    parts = [header, outlook, current, daily, rain_timeline]
 
     if alert:
 
