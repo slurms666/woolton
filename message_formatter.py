@@ -87,6 +87,12 @@ def format_rain_timeline(data: Dict) -> Tuple[str, List[Tuple[str, float]]]:
         hhmm = t[11:16]
         prob = safe_float(p)
 
+        # fallback if probability missing but rain amount exists
+        if prob == 0:
+            rain_amt = safe_float(_safe_get(hourly.get("precipitation", []), start_idx))
+            if rain_amt > 0:
+                prob = 50
+
         rain_points.append((hhmm, prob))
 
         # visual bar
